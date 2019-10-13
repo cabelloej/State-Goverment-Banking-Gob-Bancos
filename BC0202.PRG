@@ -1,0 +1,236 @@
+SELECT 1
+USE BCCTAS INDEX BCCTAS
+SELECT 2
+USE BCOPERA INDEX BCOPERA1,BCOPERA2,BCOPERA3,BCOPERA4,BCOPERA5
+SELECT 2
+SET ORDER TO 3
+STORE 15 TO WRANGO
+DIME MATRIX(WRANGO)
+STORE .T. TO WCON1
+DO WHILE WCON1
+   SET COLOR TO
+   @ 04,00 CLEAR
+   @ 04,00 SAY "CONCILIACION BANCARIA"
+   @ 05,00 TO 9,50
+   @ 06,01 SAY "CUENTA :"
+   @ 07,01 SAY "A"+CHR(165)+"O    :"
+   @ 08,01 SAY "MES    :"
+   @ 06,10 GET WCUENTA
+   READ
+   IF WCUENTA=SPACE(6).OR.READKEY()=12.OR.READKEY()=268
+      EXIT
+   ENDIF
+   SELECT 1
+   SEEK WCUENTA
+   IF EOF()
+      STORE "CUENTA NO REGISTRADA, VERIFIQUE." TO MES
+      DO AVISO WITH MES
+      LOOP
+   ENDIF
+   @ 06,18 SAY DESCRI
+   STORE YEAR(DATE())  TO WYEAR
+   STORE MONTH(DATE()) TO WMONTH
+
+   @ 07,10 GET WYEAR PICTURE "9999"
+   READ
+   IF WYEAR=0.OR.READKEY()=12.OR.READKEY()=268
+      LOOP
+   ENDIF
+   @ 08,10 GET WMONTH PICTURE "99"
+   READ
+   IF WMONTH<=0.OR. WMONTH>12.OR.READKEY()=12.OR.READKEY()=268
+      LOOP
+   ENDIF
+   STORE "CAMBIOS A ESTA CONCILIACION AFECTARAN A LAS CONCILIACIONES POSTERIORES" TO MES
+   DO AVISO WITH MES
+   STORE "OPCIONES: (C)ONTINUAR, (S)ALIR" TO TEX
+   STORE "SC" TO WCH
+   DO PREGUNTA
+   IF WCH = "S"
+      LOOP
+   ENDIF
+
+   STORE 1  TO WDESDE
+   STORE .T. TO WVIENDO
+   DO WHILE WVIENDO
+      STORE 0 TO WLINMAX
+      DO WHILE WLINMAX < WRANGO
+         STORE WLINMAX + 1 TO WLINMAX
+         STORE SPACE(12) TO MATRIX(WLINMAX)
+      ENDDO
+      @ 04,30 SAY "CUENTA No.:"+WCUENTA
+      @ 04,50 SAY "A"+CHR(165)+"O:"+STR(WYEAR,4)
+      @ 04,70 SAY "MES:"+STR(WMONTH,2)
+      @ 05,00 CLEAR
+      @ 06,00 SAY "SERIAL      "
+      @ 06,14 SAY "FECHA   "
+      @ 06,26 SAY "TO"
+      @ 06,30 SAY "NUMERO      "
+      @ 06,45 SAY "           MONTO"
+      @ 06,65 SAY "CONCILIA"
+      STORE 0  TO WCONTREC
+      STORE 0  TO WLINMAX
+      STORE 6  TO WLINEA
+
+      SELECT 2
+      FIND &WCUENTA
+      DO WHILE .NOT. EOF() .AND. CTA = WCUENTA
+         *** RECHAZA REGISTROS ANULADOS
+         IF ESTATUS = "AN"
+            SELECT 2
+            SKIP
+            LOOP
+         ENDIF
+         *** RECHAZA REGISTROS CON FECHAS DE ELABORACION POSTERIORES
+         STORE YEAR(FECHA)  TO WYEARREC
+         STORE MONTH(FECHA) TO WMONTHREC
+         IF WYEARREC > WYEAR
+            SELECT 2
+            SKIP
+            LOOP
+         ENDIF
+         IF WYEARREC = WYEAR .AND. WMONTHREC > WMONTH
+            SELECT 2
+            SKIP
+            LOOP
+         ENDIF
+         *** RECHAZA REGISTROS YA CONCILIADOS ANTERIORMENTE
+         IF ESTATUS = "CO"
+            STORE  YEAR(ESTATFECHA)  TO WYEARSTAT
+            STORE  MONTH(ESTATFECHA) TO WMONTHSTAT
+            IF WYEARSTAT < WYEAR
+               SELECT 2
+               SKIP
+               LOOP
+            ENDIF
+            IF WYEARSTAT=WYEAR.AND.WMONTHSTAT < WMONTH
+               SELECT 2
+               SKIP
+               LOOP
+            ENDIF
+         ENDIF
+         *** SELECCION DE BLOQUE DE REGISTROS A EDITAR
+         STORE WCONTREC+1 TO WCONTREC
+         IF WCONTREC < WDESDE
+            SELECT 2
+            SKIP
+            LOOP
+         ENDIF
+         IF WCONTREC > (WDESDE+WRANGO)-1
+            EXIT
+         ENDIF
+         *** FIN SELECCION DE BLOQUE
+
+         STORE WLINEA+1 TO WLINEA
+         @ WLINEA,00 SAY SERIAL
+         @ WLINEA,14 SAY FECHA
+         @ WLINEA,26 SAY TIPOPE
+         @ WLINEA,30 SAY NUMOPE
+         @ WLINEA,46 SAY MONTO PICTURE "####,###,###.##"
+         *** MUESTRA SI LA CONCILIACION DEL REGISTRO ES LA QUE SE ESTA PROCESANDO
+         IF ESTATUS="CO".AND.YEAR(ESTATFECHA)=WYEAR.AND.MONTH(ESTATFECHA)=WMONTH
+            STORE "SI" TO WSINO
+         ELSE
+            STORE "  " TO WSINO
+         ENDIF
+         @ WLINEA,65 SAY WSINO
+
+         STORE WLINMAX + 1 TO WLINMAX
+         STORE SERIAL TO MATRIX(WLINMAX)
+         SELECT 2
+         SKIP
+      ENDDO
+      STORE "OPCIONES: (S)UBIR, (B)AJAR, (C)ONCILIAR, (A)BANDONAR" TO TEX
+      STORE "CSBA" TO WCH
+      DO PREGUNTA
+      STORE WCH TO WCSB
+      IF WCSB="A"
+         EXIT
+      ENDIF
+      IF WCSB = "S"
+         STORE WDESDE - WRANGO TO WDESDE
+         IF WDESDE <= 0
+            STORE WDESDE + WRANGO TO WDESDE
+         ENDIF
+      ENDIF
+      IF WCSB = "B"
+         STORE WDESDE + WRANGO TO WDESDE
+        *IF WDESDE > ???
+        *   STORE WDESDE - WRANGO TO WDESDE
+        *ENDIF
+      ENDIF
+      IF WCSB="C"
+         STORE "INGRESE EL SERIAL DE LA OPERACION" TO MES
+         DO MENSAJE WITH MES
+         STORE 0 TO WQSERIALN
+         @ 23,60 GET WQSERIALN PICTURE "999999999999"
+         READ
+         IF WQSERIALN = 0 .OR.READKEY()=12.OR.READKEY()=268
+            LOOP
+         ENDIF
+         *** RUTINA PARA CONVERTIR UN NUMERO EN CARACTER
+         STORE WQSERIALN TO WNUMBERN
+         STORE SPACE(12) TO WNUMBERC
+         DO STRNUMBER
+         STORE WNUMBERC TO WQSERIALC
+         *** FIN RUTINA
+         @ 23,60 SAY WQSERIALC
+         *** VALIDA QUE EL SERIAL SOLICITADO ESTE EN PANTALLA
+         STORE .F. TO WVALID
+         STORE 0 TO WLINMAX
+         DO WHILE WLINMAX < WRANGO
+            STORE WLINMAX + 1 TO WLINMAX
+            IF MATRIX(WLINMAX)=WQSERIALC
+               SELECT 2
+               SET ORDER TO 5
+               FIND &WQSERIALC
+               SET ORDER TO 3
+               IF EOF()
+                  STORE "ERROR FATAL:SERIAL DE OPERACION NO REGISTRADO EN EL SISTEMA" TO MES
+                  DO AVISO WITH MES
+                  LOOP
+               ENDIF
+               DO RECLOC
+               IF (ESTATUS = "ET") .OR. ;
+                  (ESTATUS = "CO".AND.YEAR(ESTATFECHA)=WYEAR.AND.MONTH(ESTATFECHA)>WMONTH) .OR. ;
+                  (ESTATUS = "CO".AND.YEAR(ESTATFECHA)>WYEAR)
+                  *** DIA DEL MES EN EL QUE SE CONCILIO
+                  STORE .T. TO WGETDIA
+                  DO WHILE WGETDIA
+                     STORE 0 TO WDIA
+                     STORE "INGRESE EL DIA DE LA CONCILIACION:" TO MES
+                     DO MENSAJE WITH MES
+                     @ 23,58 GET WDIA PICTURE "##"
+                     READ
+                     STORE CTOD(STR(WDIA,2)+"-"+STR(WMONTH,2)+"-"+STR(WYEAR,4)) TO WFECHACONCI
+                     IF WFECHACONCI <> CTOD("  -  -  ")
+                        EXIT
+                     ENDIF
+                  ENDDO
+                  ***
+                  REPLACE ESTATUS WITH "CO"
+                  REPLACE ESTATFECHA WITH WFECHACONCI
+               ELSE
+                  IF ESTATUS="CO".AND.YEAR(ESTATFECHA)=WYEAR.AND.MONTH(ESTATFECHA)=WMONTH
+                     REPLACE ESTATUS WITH "ET"
+                     REPLACE ESTATFECHA WITH CTOD("  -  -  ")
+                  ENDIF
+               ENDIF
+               UNLOCK
+               STORE .T. TO WVALID
+               EXIT
+            ENDIF
+         ENDDO
+         IF .NOT. WVALID
+            STORE "SERIAL SOLICITADO NO ESTA EN PANTALLA, VERIFIQUE" TO MES
+            DO AVISO WITH MES
+            LOOP
+         ENDIF
+      ENDIF
+   ENDDO
+ENDDO
+CLOSE DATA
+CLOSE INDEX
+RETURN
+
+
